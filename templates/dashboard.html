@@ -12,9 +12,12 @@
         <header class="header">
             <div>
                 <h1>Welcome, {{ user[0] }}</h1>
-                <p class="role-badge">{{ user[2] }}</p>
+                <p class="role-badge">Role: <strong>{{ user[2] }}</strong> | Email: {{ user[1] }}</p>
             </div>
-            <a href="/" class="btn-logout">Logout</a>
+            <div>
+                <a href="/download_excel" class="btn-excel">📥 Export Excel</a>
+                <a href="/" class="btn-logout">Logout</a>
+            </div>
         </header>
 
         {% with messages = get_flashed_messages() %}
@@ -61,7 +64,7 @@
 
         <!-- History Table -->
         <div class="card history-card">
-            <h3>Attendance History</h3>
+            <h3>Your Attendance History</h3>
             <div class="stats">
                 <span>Total Present: <strong class="text-success">{{ total_present }}</strong></span>
                 <span>Total Absent: <strong class="text-danger">{{ total_absent }}</strong></span>
