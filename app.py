@@ -10,11 +10,62 @@ DB_NAME = "attendance.db"
 # இந்திய நேர மண்டலம் (IST)
 IST = pytz.timezone('Asia/Kolkata')
 
+# 1. டேட்டாபேஸ் மற்றும் டேபிள்களைத் தானாக உருவாக்கும் ஃபங்ஷன்
+def init_db():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    
+    # members டேபிள் உருவாக்குதல்
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            role TEXT NOT NULL
+        )
+    ''')
+    
+    # attendance டேபிள் உருவாக்குதல்
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS attendance (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL,
+            date TEXT NOT NULL,
+            time TEXT NOT NULL,
+            status TEXT NOT NULL
+        )
+    ''')
+    
+    # சோதனைக்காக ஒரு டெஸ்ட் பயனர் (Test User) சேர்க்கிறது
+    cursor.execute('''
+        INSERT OR IGNORE INTO members (name, email, role) 
+        VALUES ('Student User', 'user@example.com', 'Student')
+    ''')
+    
+    conn.commit()
+    conn.close()
+
+# ஆப் தொடங்கும் போது டேட்டாபேஸை இனிஷியலைஸ் செய்ய
+init_db()
+
 @app.route('/', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         email = request.form['email']
-        return redirect(url_for('dashboard', email=email))
+        
+        # பயனர் டேட்டாபேஸில் இருக்கிறாரா என்று சரிபார்த்தல்
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute("SELECT email FROM members WHERE email=?", (email,))
+        user = cursor.fetchone()
+        conn.close()
+        
+        if user:
+            return redirect(url_for('dashboard', email=email))
+        else:
+            flash("Email ID Not Found! Try: user@example.com")
+            return redirect(url_for('login'))
+            
     return render_template('login.html')
 
 @app.route('/dashboard', methods=['GET', 'POST'])
@@ -36,18 +87,14 @@ def dashboard():
     cursor.execute("SELECT date, time, status FROM attendance WHERE email=? ORDER BY id DESC", (email,))
     history = cursor.fetchall()
     
-    # இந்திய நேரப்படி இன்றைய தேதி
     now = datetime.now(IST)
     today_date = now.strftime("%Y-%m-%d")
     
-    # கேலண்டர் மூலம் தேதியைத் தேர்ந்தெடுத்தால் அந்த தேதி
     selected_date = request.form.get('selected_date', today_date)
     
-    # தேர்ந்தெடுத்த தேதிக்கான வருகைப் பதிவு
     cursor.execute("SELECT status, time FROM attendance WHERE email=? AND date=?", (email, selected_date))
     date_record = cursor.fetchone()
     
-    # கணக்கீடு (Analytics)
     total_present = sum(1 for row in history if row[2] == 'Present')
     total_absent = sum(1 for row in history if row[2] == 'Absent')
     
@@ -63,7 +110,6 @@ def mark_attendance():
     email = request.form['email']
     status = request.form['status']
     
-    # இந்திய நேரத்தைச் சேமித்தல்
     now = datetime.now(IST)
     date = now.strftime("%Y-%m-%d")
     time = now.strftime("%I:%M:%S %p")
