@@ -36,7 +36,7 @@ def dashboard():
     cursor.execute("SELECT date, time, status FROM attendance WHERE email=? ORDER BY id DESC", (email,))
     history = cursor.fetchall()
     
-    # தற்போதைய இந்திய தேதி
+    # இந்திய நேரப்படி இன்றைய தேதி
     now = datetime.now(IST)
     today_date = now.strftime("%Y-%m-%d")
     
@@ -47,7 +47,7 @@ def dashboard():
     cursor.execute("SELECT status, time FROM attendance WHERE email=? AND date=?", (email, selected_date))
     date_record = cursor.fetchone()
     
-    # Quick Analytics
+    # கணக்கீடு (Analytics)
     total_present = sum(1 for row in history if row[2] == 'Present')
     total_absent = sum(1 for row in history if row[2] == 'Absent')
     
@@ -63,7 +63,7 @@ def mark_attendance():
     email = request.form['email']
     status = request.form['status']
     
-    # இந்திய நேரத்தைப் பெறுதல்
+    # இந்திய நேரத்தைச் சேமித்தல்
     now = datetime.now(IST)
     date = now.strftime("%Y-%m-%d")
     time = now.strftime("%I:%M:%S %p")
