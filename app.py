@@ -9,6 +9,7 @@ app = Flask(__name__)
 app.secret_key = "secret_key_123"
 DB_NAME = "attendance.db"
 
+# இந்திய நேர மண்டலம் (IST)
 IST = pytz.timezone('Asia/Kolkata')
 
 def init_db():
@@ -34,7 +35,6 @@ def init_db():
         )
     ''')
     
-    # நீங்கள் கொடுத்த உறுப்பினர்கள் சேர்க்கப்படுகிறார்கள்
     default_members = [
         ('Sivamani V', 'sivamani@example.com', 'CEO & Founder'),
         ('Anusha', 'anusha@example.com', 'Technical coordinator'),
@@ -68,7 +68,6 @@ def login():
         cursor.execute("SELECT email FROM members WHERE email=?", (email,))
         user = cursor.fetchone()
         
-        # புதிய உறுப்பினராக இருந்தால் Member ஆகச் சேர்க்கும்
         if not user:
             cursor.execute("INSERT INTO members (name, email, role) VALUES (?, ?, ?)", 
                            (name, email, 'Team Member'))
@@ -104,6 +103,10 @@ def dashboard():
     now = datetime.now(IST)
     today_date = now.strftime("%Y-%m-%d")
     
+    # இன்றைய நாளுக்கான வருகைப் பதிவு ஏற்கனவே செய்யப்பட்டுள்ளதா எனச் சரிபார்க்கிறது
+    cursor.execute("SELECT status, time FROM attendance WHERE email=? AND date=?", (email, today_date))
+    today_attendance = cursor.fetchone()
+    
     selected_date = request.form.get('selected_date', today_date)
     
     cursor.execute("SELECT status, time FROM attendance WHERE email=? AND date=?", (email, selected_date))
@@ -116,7 +119,7 @@ def dashboard():
     
     return render_template('dashboard.html', user=user, history=history, 
                            today_date=today_date, selected_date=selected_date,
-                           date_record=date_record,
+                           date_record=date_record, today_attendance=today_attendance,
                            total_present=total_present, total_absent=total_absent)
 
 @app.route('/mark_attendance', methods=['POST'])
@@ -130,15 +133,22 @@ def mark_attendance():
     
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO attendance (email, date, time, status) VALUES (?, ?, ?, ?)", 
-                   (email, date, time, status))
-    conn.commit()
-    conn.close()
     
-    flash("Attendance Marked Successfully!")
+    # 🔒 பாதுகாப்பு செக்: இன்றைய தேதியில் ஏற்கனவே பதிவு செய்யப்பட்டுள்ளதா எனப் பார்க்கிறது
+    cursor.execute("SELECT id FROM attendance WHERE email=? AND date=?", (email, date))
+    existing_record = cursor.fetchone()
+    
+    if existing_record:
+        flash("❌ Attendance already marked for today!")
+    else:
+        cursor.execute("INSERT INTO attendance (email, date, time, status) VALUES (?, ?, ?, ?)", 
+                       (email, date, time, status))
+        conn.commit()
+        flash("✅ Attendance Marked Successfully!")
+        
+    conn.close()
     return redirect(url_for('dashboard', email=email))
 
-# 📊 EXCEL DOWNLOAD ROUTE
 @app.route('/download_excel')
 def download_excel():
     conn = sqlite3.connect(DB_NAME)
