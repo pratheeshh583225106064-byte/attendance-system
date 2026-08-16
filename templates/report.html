@@ -1,52 +1,59 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <title>Overall Attendance Report</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Report</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-
 <body>
-    <div class="card" style="max-width: 900px;">
-        <h2>Overall Attendance Records</h2>
+    <div class="dashboard-container">
+        <header class="header">
+            <div>
+                <h1>📊 Attendance Report</h1>
+                <p class="role-badge">View and export attendance records</p>
+            </div>
+            <div>
+                <a href="/download_excel" class="btn-excel">📥 Export Excel</a>
+                <a href="/dashboard" class="btn-primary" style="text-decoration: none; padding: 8px 16px;">Back to Dashboard</a>
+            </div>
+        </header>
 
-        <a href="/download_excel" class="btn btn-excel">📥 Download Excel Report (.xlsx)</a>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Member Name</th>
-                    <th>Email</th>
-                    <th>Date</th>
-                    <th>Time</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in records %}
-                <tr>
-                    <td style="font-weight: 600;">{{ row[0] }}</td>
-                    <td>{{ row[1] }}</td>
-                    <td>{{ row[2] }}</td>
-                    <td>{{ row[3] }}</td>
-                    <td>
-                        <span class="{{ 'badge-present' if row[4] == 'Present' else 'badge-absent' }}">{{ row[4]
-                            }}</span>
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="5" style="color: #94a3b8;">No attendance records found.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-
-        <div style="margin-top: 24px; text-align: center;">
-            <a href="/" class="btn-link">← Back to Login</a>
+        <div class="card history-card">
+            <h3>All Team Members Attendance Log</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Role</th>
+                        <th>Email</th>
+                        <th>Date</th>
+                        <th>Time (IST)</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in reports %}
+                    <tr>
+                        <td><strong>{{ row[0] }}</strong></td>
+                        <td>{{ row[1] }}</td>
+                        <td>{{ row[2] }}</td>
+                        <td>{{ row[3] }}</td>
+                        <td>{{ row[4] }}</td>
+                        <td>
+                            <span class="badge {% if row[5] == 'Present' %}badge-present{% else %}badge-absent{% endif %}">
+                                {{ row[5] }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" style="text-align: center;">No report data available.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </body>
-
 </html>
