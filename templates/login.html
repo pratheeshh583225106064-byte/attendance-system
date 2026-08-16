@@ -8,8 +8,12 @@
 </head>
 <body class="login-body">
     <div class="login-card">
+        <!-- மையத்தில் லோகோ -->
+        <div class="logo-container">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Bitron Logo" class="login-logo">
+        </div>
+
         <h2>Attendance Portal</h2>
-        <p class="subtitle">Enter details (Email format: name1234@gmail.com)</p>
 
         {% with messages = get_flashed_messages() %}
             {% if messages %}
