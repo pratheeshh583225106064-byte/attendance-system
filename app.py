@@ -1,13 +1,14 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, send_file
 import sqlite3
 from datetime import datetime
 import pytz
+import pandas as pd
+import io
 
 app = Flask(__name__)
 app.secret_key = "secret_key_123"
 DB_NAME = "attendance.db"
 
-# இந்திய நேர மண்டலம் (IST)
 IST = pytz.timezone('Asia/Kolkata')
 
 def init_db():
@@ -33,10 +34,22 @@ def init_db():
         )
     ''')
     
+    # நீங்கள் கொடுத்த உறுப்பினர்கள் சேர்க்கப்படுகிறார்கள்
+    default_members = [
+        ('Sivamani V', 'sivamani@example.com', 'CEO & Founder'),
+        ('Anusha', 'anusha@example.com', 'Technical coordinator'),
+        ('Dharshan G', 'dharshan@example.com', 'IoT Engineer'),
+        ('Aisha mariyam', 'aisha@example.com', 'IoT Engineer'),
+        ('Meenakshi Priyadarshini', 'meenakshi@example.com', 'PCB Designer'),
+        ('Shyam kumar M', 'shyam@example.com', 'PCB designer')
+    ]
+    
+    for name, email, role in default_members:
+        cursor.execute("INSERT OR IGNORE INTO members (name, email, role) VALUES (?, ?, ?)", (name, email, role))
+        
     conn.commit()
     conn.close()
 
-# ஆப் தொடங்கும் போது டேட்டாபேஸை தயார் செய்ய
 init_db()
 
 @app.route('/', methods=['GET', 'POST'])
@@ -46,7 +59,7 @@ def login():
         email = request.form.get('email')
         
         if not name or not email:
-            flash("Please fill in both Name and Email!")
+            flash("Please enter both Name and Email!")
             return redirect(url_for('login'))
 
         conn = sqlite3.connect(DB_NAME)
@@ -55,9 +68,10 @@ def login():
         cursor.execute("SELECT email FROM members WHERE email=?", (email,))
         user = cursor.fetchone()
         
+        # புதிய உறுப்பினராக இருந்தால் Member ஆகச் சேர்க்கும்
         if not user:
             cursor.execute("INSERT INTO members (name, email, role) VALUES (?, ?, ?)", 
-                           (name, email, 'Student'))
+                           (name, email, 'Team Member'))
             conn.commit()
         else:
             cursor.execute("UPDATE members SET name=? WHERE email=?", (name, email))
@@ -124,14 +138,28 @@ def mark_attendance():
     flash("Attendance Marked Successfully!")
     return redirect(url_for('dashboard', email=email))
 
-@app.route('/report')
-def report():
+# 📊 EXCEL DOWNLOAD ROUTE
+@app.route('/download_excel')
+def download_excel():
     conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT m.name, a.email, a.date, a.time, a.status FROM attendance a JOIN members m ON a.email = m.email ORDER BY a.id DESC")
-    all_records = cursor.fetchall()
+    query = """
+        SELECT m.name AS 'Name', m.role AS 'Role', a.email AS 'Email', 
+               a.date AS 'Date', a.time AS 'Time (IST)', a.status AS 'Status'
+        FROM attendance a 
+        JOIN members m ON a.email = m.email 
+        ORDER BY a.id DESC
+    """
+    df = pd.read_sql_query(query, conn)
     conn.close()
-    return render_template('report.html', all_records=all_records)
+    
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Attendance_Report')
+    
+    output.seek(0)
+    return send_file(output, 
+                     download_name=f"Attendance_Report_{datetime.now(IST).strftime('%Y-%m-%d')}.xlsx", 
+                     as_attachment=True)
 
 if __name__ == '__main__':
     app.run(debug=True)
