@@ -1,92 +1,98 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <title>Member Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Attendance System</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-
 <body>
-    <div class="card">
-        <h2>Member Dashboard</h2>
-
-        <!-- User Information Badge -->
-        <div class="user-badge">
-            <p><strong>Name:</strong> <span>{{ user[0] }}</span></p>
-            <p><strong>Email:</strong> <span>{{ user[1] }}</span></p>
-            <p><strong>Role:</strong> <span>{{ user[2] }}</span></p>
-        </div>
-
-        <!-- Attendance Analytics Grid -->
-        <div class="stats-grid">
-            <div class="stat-card stat-present">
-                <h4>Total Present</h4>
-                <p>{{ total_present }}</p>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header class="header">
+            <div>
+                <h1>Welcome, {{ user[0] }}</h1>
+                <p class="role-badge">{{ user[2] }}</p>
             </div>
-            <div class="stat-card stat-absent">
-                <h4>Total Absent</h4>
-                <p>{{ total_absent }}</p>
-            </div>
-        </div>
+            <a href="/" class="btn-logout">Logout</a>
+        </header>
 
         {% with messages = get_flashed_messages() %}
-        {% if messages %}
-        <div class="alert alert-success">{{ messages[0] }}</div>
-        {% endif %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-success">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
         {% endwith %}
 
-        <!-- Today's Attendance Section -->
-        {% if today_record %}
-        <div class="alert alert-success">
-            Today's attendance recorded: <strong>{{ today_record[0] }}</strong> at {{ today_record[1] }}
+        <!-- Quick Action: Mark Attendance -->
+        <div class="card action-card">
+            <h3>Mark Today's Attendance</h3>
+            <p>Today's Date: <strong>{{ today_date }}</strong></p>
+            <form action="/mark_attendance" method="POST" class="mark-form">
+                <input type="hidden" name="email" value="{{ user[1] }}">
+                <button type="submit" name="status" value="Present" class="btn-present">Mark PRESENT</button>
+                <button type="submit" name="status" value="Absent" class="btn-absent">Mark ABSENT</button>
+            </form>
         </div>
-        {% else %}
-        <p style="text-align: center; font-size: 14px; font-weight: 600; color: #475569; margin-bottom: 8px;">
-            Today's Date: {{ today_date }}
-        </p>
-        <form action="/mark_attendance" method="POST">
-            <input type="hidden" name="email" value="{{ user[1] }}">
-            <div class="btn-group">
-                <button type="submit" name="status" value="Present" class="btn btn-present">Mark Present</button>
-                <button type="submit" name="status" value="Absent" class="btn btn-absent">Mark Absent</button>
-            </div>
-        </form>
-        {% endif %}
 
-        <!-- Attendance History Table -->
-        <h3 style="margin-top: 24px; color: #1e1b4b; font-size: 18px;">Personal Attendance History</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Time</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in history %}
-                <tr>
-                    <td>{{ row[0] }}</td>
-                    <td>{{ row[1] }}</td>
-                    <td>
-                        <span class="{{ 'badge-present' if row[2] == 'Present' else 'badge-absent' }}">{{ row[2]
-                            }}</span>
-                    </td>
-                </tr>
+        <!-- Date Picker Filter -->
+        <div class="card calendar-card">
+            <h3>📅 Check Attendance by Date</h3>
+            <form action="/dashboard" method="POST" class="calendar-form">
+                <input type="hidden" name="email" value="{{ user[1] }}">
+                <label for="selected_date">Select Date:</label>
+                <input type="date" id="selected_date" name="selected_date" value="{{ selected_date }}" required onchange="this.form.submit()">
+            </form>
+
+            <div class="date-status">
+                Status for <strong>{{ selected_date }}</strong>: 
+                {% if date_record %}
+                    {% if date_record[0] == 'Present' %}
+                        <span class="badge badge-present">PRESENT (at {{ date_record[1] }})</span>
+                    {% else %}
+                        <span class="badge badge-absent">ABSENT (at {{ date_record[1] }})</span>
+                    {% endif %}
                 {% else %}
-                <tr>
-                    <td colspan="3" style="color: #94a3b8;">No records found.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                    <span class="badge badge-none">No Record Found</span>
+                {% endif %}
+            </div>
+        </div>
 
-        <div style="margin-top: 24px; display: flex; justify-content: space-between; align-items: center;">
-            <a href="{{ url_for('report') }}" class="btn-link">View Overall Report</a>
-            <a href="/" class="btn-link">Sign Out</a>
+        <!-- History Table -->
+        <div class="card history-card">
+            <h3>Attendance History</h3>
+            <div class="stats">
+                <span>Total Present: <strong class="text-success">{{ total_present }}</strong></span>
+                <span>Total Absent: <strong class="text-danger">{{ total_absent }}</strong></span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Time (IST)</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in history %}
+                    <tr>
+                        <td>{{ row[0] }}</td>
+                        <td>{{ row[1] }}</td>
+                        <td>
+                            <span class="badge {% if row[2] == 'Present' %}badge-present{% else %}badge-absent{% endif %}">
+                                {{ row[2] }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" style="text-align: center;">No attendance history found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </body>
-
 </html>
