@@ -157,3 +157,13 @@ th { color: #94a3b8; }
     margin-bottom: 15px;
     text-align: center;
 }
+.btn-excel {
+    background: #10b981;
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 14px;
+    margin-right: 10px;
+}
