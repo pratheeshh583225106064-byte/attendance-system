@@ -23,7 +23,7 @@
         {% with messages = get_flashed_messages() %}
             {% if messages %}
                 {% for message in messages %}
-                    <div class="alert alert-success">{{ message }}</div>
+                    <div class="alert alert-info">{{ message }}</div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
@@ -32,11 +32,24 @@
         <div class="card action-card">
             <h3>Mark Today's Attendance</h3>
             <p>Today's Date: <strong>{{ today_date }}</strong></p>
-            <form action="/mark_attendance" method="POST" class="mark-form">
-                <input type="hidden" name="email" value="{{ user[1] }}">
-                <button type="submit" name="status" value="Present" class="btn-present">Mark PRESENT</button>
-                <button type="submit" name="status" value="Absent" class="btn-absent">Mark ABSENT</button>
-            </form>
+            
+            {% if today_attendance %}
+                <!-- 🎯 அட்டெண்டன்ஸ் ஏற்கனவே போட்டிருந்தால் பட்டன்கள் மறைந்து இந்த மெசேஜ் மட்டுமே காட்டும் -->
+                <div class="already-marked-box">
+                    <span class="icon">✅</span>
+                    <div>
+                        <strong>Attendance Already Marked for Today!</strong>
+                        <p>Status: <span class="badge {% if today_attendance[0] == 'Present' %}badge-present{% else %}badge-absent{% endif %}">{{ today_attendance[0] }}</span> at {{ today_attendance[1] }}</p>
+                    </div>
+                </div>
+            {% else %}
+                <!-- 🎯 அட்டெண்டன்ஸ் போடவில்லை என்றால் மட்டுமே பட்டன்கள் காட்டும் -->
+                <form action="/mark_attendance" method="POST" class="mark-form">
+                    <input type="hidden" name="email" value="{{ user[1] }}">
+                    <button type="submit" name="status" value="Present" class="btn-present">Mark PRESENT</button>
+                    <button type="submit" name="status" value="Absent" class="btn-absent">Mark ABSENT</button>
+                </form>
+            {% endif %}
         </div>
 
         <!-- Date Picker Filter -->
