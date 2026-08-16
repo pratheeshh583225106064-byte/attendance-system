@@ -152,6 +152,23 @@ def mark_attendance():
     conn.close()
     return redirect(url_for('dashboard', email=email))
 
+@app.route('/report')
+def report():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    
+    query = """
+        SELECT m.name, m.role, a.email, a.date, a.time, a.status
+        FROM attendance a
+        JOIN members m ON a.email = m.email
+        ORDER BY a.id DESC
+    """
+    cursor.execute(query)
+    reports = cursor.fetchall()
+    conn.close()
+    
+    return render_template('report.html', reports=reports)
+
 @app.route('/download_excel')
 def download_excel():
     conn = sqlite3.connect(DB_NAME)
