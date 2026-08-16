@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Member Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <div class="card">
+        <h2>Member Dashboard</h2>
+
+        <!-- User Information Badge -->
+        <div class="user-badge">
+            <p><strong>Name:</strong> <span>{{ user[0] }}</span></p>
+            <p><strong>Email:</strong> <span>{{ user[1] }}</span></p>
+            <p><strong>Role:</strong> <span>{{ user[2] }}</span></p>
+        </div>
+
+        <!-- Attendance Analytics Grid -->
+        <div class="stats-grid">
+            <div class="stat-card stat-present">
+                <h4>Total Present</h4>
+                <p>{{ total_present }}</p>
+            </div>
+            <div class="stat-card stat-absent">
+                <h4>Total Absent</h4>
+                <p>{{ total_absent }}</p>
+            </div>
+        </div>
+
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        <div class="alert alert-success">{{ messages[0] }}</div>
+        {% endif %}
+        {% endwith %}
+
+        <!-- Today's Attendance Section -->
+        {% if today_record %}
+        <div class="alert alert-success">
+            Today's attendance recorded: <strong>{{ today_record[0] }}</strong> at {{ today_record[1] }}
+        </div>
+        {% else %}
+        <p style="text-align: center; font-size: 14px; font-weight: 600; color: #475569; margin-bottom: 8px;">
+            Today's Date: {{ today_date }}
+        </p>
+        <form action="/mark_attendance" method="POST">
+            <input type="hidden" name="email" value="{{ user[1] }}">
+            <div class="btn-group">
+                <button type="submit" name="status" value="Present" class="btn btn-present">Mark Present</button>
+                <button type="submit" name="status" value="Absent" class="btn btn-absent">Mark Absent</button>
+            </div>
+        </form>
+        {% endif %}
+
+        <!-- Attendance History Table -->
+        <h3 style="margin-top: 24px; color: #1e1b4b; font-size: 18px;">Personal Attendance History</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in history %}
+                <tr>
+                    <td>{{ row[0] }}</td>
+                    <td>{{ row[1] }}</td>
+                    <td>
+                        <span class="{{ 'badge-present' if row[2] == 'Present' else 'badge-absent' }}">{{ row[2]
+                            }}</span>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="3" style="color: #94a3b8;">No records found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div style="margin-top: 24px; display: flex; justify-content: space-between; align-items: center;">
+            <a href="{{ url_for('report') }}" class="btn-link">View Overall Report</a>
+            <a href="/" class="btn-link">Sign Out</a>
+        </div>
+    </div>
+</body>
+
+</html>
