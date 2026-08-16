@@ -9,7 +9,7 @@
 <body class="login-body">
     <div class="login-card">
         <h2>Attendance Portal</h2>
-        <p class="subtitle">Enter your email to access dashboard</p>
+        <p class="subtitle">Enter your details to access dashboard</p>
 
         {% with messages = get_flashed_messages() %}
             {% if messages %}
@@ -21,10 +21,14 @@
 
         <form action="/" method="POST">
             <div class="form-group">
+                <label for="name">Full Name</label>
+                <input type="text" id="name" name="name" placeholder="Enter your name" required>
+            </div>
+            <div class="form-group">
                 <label for="email">Email Address</label>
                 <input type="email" id="email" name="email" placeholder="e.g. user@example.com" required>
             </div>
-            <button type="submit" class="btn-primary">Login to Dashboard</button>
+            <button type="submit" class="btn-primary">Login / Register</button>
         </form>
     </div>
 </body>
