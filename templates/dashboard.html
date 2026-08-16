@@ -8,7 +8,6 @@
 </head>
 <body>
     <div class="dashboard-container">
-        <!-- Header -->
         <header class="header">
             <div>
                 <h1>Welcome, {{ user[0] }}</h1>
@@ -23,18 +22,16 @@
         {% with messages = get_flashed_messages() %}
             {% if messages %}
                 {% for message in messages %}
-                    <div class="alert alert-info">{{ message }}</div>
+                    <div class="alert">{{ message }}</div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
 
-        <!-- Quick Action: Mark Attendance -->
         <div class="card action-card">
             <h3>Mark Today's Attendance</h3>
             <p>Today's Date: <strong>{{ today_date }}</strong></p>
             
             {% if today_attendance %}
-                <!-- 🎯 அட்டெண்டன்ஸ் ஏற்கனவே போட்டிருந்தால் பட்டன்கள் மறைந்து இந்த மெசேஜ் மட்டுமே காட்டும் -->
                 <div class="already-marked-box">
                     <span class="icon">✅</span>
                     <div>
@@ -43,7 +40,6 @@
                     </div>
                 </div>
             {% else %}
-                <!-- 🎯 அட்டெண்டன்ஸ் போடவில்லை என்றால் மட்டுமே பட்டன்கள் காட்டும் -->
                 <form action="/mark_attendance" method="POST" class="mark-form">
                     <input type="hidden" name="email" value="{{ user[1] }}">
                     <button type="submit" name="status" value="Present" class="btn-present">Mark PRESENT</button>
@@ -51,15 +47,7 @@
                 </form>
             {% endif %}
         </div>
-<div class="form-group">
-    <label for="email">Email Address</label>
-    <input type="email" id="email" name="email" 
-           placeholder="e.g. sivamani1234@gmail.com" 
-           pattern="[a-zA-Z]+[0-9]+@gmail\.com" 
-           title="Email must be in the format: name1234@gmail.com" 
-           required>
-</div>
-        <!-- Date Picker Filter -->
+
         <div class="card calendar-card">
             <h3>📅 Check Attendance by Date</h3>
             <form action="/dashboard" method="POST" class="calendar-form">
@@ -82,7 +70,6 @@
             </div>
         </div>
 
-        <!-- History Table -->
         <div class="card history-card">
             <h3>Your Attendance History</h3>
             <div class="stats">
