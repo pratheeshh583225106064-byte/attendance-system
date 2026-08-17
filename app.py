@@ -52,12 +52,12 @@ def init_db():
 
 init_db()
 
-# 1. பிரதான பக்கம் (Main BITRON Website)
+# Main BITRON Website Route
 @app.route('/')
 def home():
     return render_template('bitron-website-1.html')
 
-# 2. லாகின் பக்கம் (Attendance Portal Login)
+# Attendance Portal Login Route
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
