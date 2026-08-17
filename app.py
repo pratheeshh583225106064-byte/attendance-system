@@ -35,13 +35,15 @@ def init_db():
         )
     ''')
     
+    # 7 அங்கீகரிக்கப்பட்ட உறுப்பினர்கள் பட்டியல்
     default_members = [
         ('Sivamani V', 'sivamani1234@gmail.com', 'CEO & Founder'),
         ('Anusha', 'anusha1234@gmail.com', 'Technical coordinator'),
         ('Dharshan G', 'dharshan1234@gmail.com', 'IoT Engineer'),
         ('Aisha mariyam', 'aisha1234@gmail.com', 'IoT Engineer'),
         ('Meenakshi Priyadarshini', 'meenakshi1234@gmail.com', 'PCB Designer'),
-        ('Shyam kumar M', 'shyam1234@gmail.com', 'PCB designer')
+        ('Shyam kumar M', 'shyam1234@gmail.com', 'PCB designer'),
+        ('Pratheesh H', 'pratheesh1234@gmail.com', 'Team Member')  # உங்கள் பெயர் சேர்க்கப்பட்டுள்ளது
     ]
     
     for name, email, role in default_members:
@@ -52,12 +54,12 @@ def init_db():
 
 init_db()
 
-# Main BITRON Website Route
+# 1. பிரதான பக்கம் (Main BITRON Website)
 @app.route('/')
 def home():
     return render_template('bitron-website-1.html')
 
-# Attendance Portal Login Route
+# 2. லாகின் பக்கம் (Attendance Portal Login)
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -79,10 +81,11 @@ def login():
         cursor.execute("SELECT email FROM members WHERE email=?", (email,))
         user = cursor.fetchone()
         
+        # 7 பேரைத் தவிர வேறு யாராவது லாகின் செய்தால் தடுக்கும் பகுதி
         if not user:
-            cursor.execute("INSERT INTO members (name, email, role) VALUES (?, ?, ?)", 
-                           (name, email, 'Team Member'))
-            conn.commit()
+            conn.close()
+            flash("❌ Access Denied! You are not an authorized member.")
+            return redirect(url_for('login'))
         else:
             cursor.execute("UPDATE members SET name=? WHERE email=?", (name, email))
             conn.commit()
