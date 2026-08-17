@@ -51,17 +51,14 @@ def init_db():
     conn.close()
 
 init_db()
-# பிரதான பக்கம் (Main Website)
+
+# 1. பிரதான பக்கம் (Main BITRON Website)
 @app.route('/')
 def home():
     return render_template('bitron-website-1.html')
 
-# லாகின் பக்கம் (Attendance Portal Login)
-@app.route('/login')
-def login():
-    return render_template('login.html') # உங்கள் லாகின் HTML கோப்பின் பெயர்
-
-@app.route('/', methods=['GET', 'POST'])
+# 2. லாகின் பக்கம் (Attendance Portal Login)
+@app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         name = request.form.get('name')
