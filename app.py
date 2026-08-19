@@ -39,7 +39,7 @@ def init_db():
     default_members = [
         ('Sivamani V', 'sivamani1234@gmail.com', 'CEO & Founder'),
         ('Anusha', 'anusha1234@gmail.com', 'Technical coordinator'),
-        ('Dharshana G', 'dharshana1234@gmail.com', 'IoT Engineer'),
+        ('Dharsana G', 'dharsana1234@gmail.com', 'IoT Engineer'),
         ('Aisha mariyam', 'aisha1234@gmail.com', 'IoT Engineer'),
         ('Meenakshi Priyadarshini', 'meenakshi1234@gmail.com', 'PCB Designer'),
         ('Shyam kumar M', 'shyam1234@gmail.com', 'PCB designer'),
