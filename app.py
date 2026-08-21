@@ -15,11 +15,10 @@ app.secret_key = "secret_key_123"
 # MongoDB Connection String
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://pratheeshh583225106064_db_user:plcKiS5p7c4S0G15@bitron.gge3k34.mongodb.net/?appName=Bitron")
 
-# Strict SSL Check-ஐ தவிர்க்க tlsInsecure=True சேர்க்கப்பட்டது
+# Certifi CA File மூலம் SSL சரிபார்க்கும் முறை
 client = MongoClient(
     MONGO_URI,
-    tls=True,
-    tlsInsecure=True
+    tlsCAFile=certifi.where()
 )
 
 db = client['attendance_system']
@@ -174,7 +173,6 @@ def download_excel():
     ws = wb.active
     ws.title = "Attendance Report"
     
-    # Border Style
     thin_border = Border(
         left=Side(style='thin', color='D3D3D3'),
         right=Side(style='thin', color='D3D3D3'),
@@ -182,7 +180,6 @@ def download_excel():
         bottom=Side(style='thin', color='D3D3D3')
     )
     
-    # Headers
     headers = ['Name', 'Role', 'Email', 'Date', 'Time (IST)', 'Status']
     ws.append(headers)
     
@@ -195,9 +192,7 @@ def download_excel():
         cell.alignment = Alignment(horizontal="center", vertical="center")
         cell.border = thin_border
 
-    # Data Formatting
     attendance_records = attendance_col.find().sort('_id', -1)
-    
     data_font = Font(name="Arial", size=10)
     
     for row_idx, att in enumerate(attendance_records, start=2):
@@ -216,7 +211,6 @@ def download_excel():
             cell.fill = row_fill
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Column Width Auto-Adjustment
     for col in ws.columns:
         max_len = max(len(str(cell.value or '')) for cell in col)
         col_letter = openpyxl.utils.get_column_letter(col[0].column)
