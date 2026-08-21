@@ -11,9 +11,16 @@ import os
 app = Flask(__name__)
 app.secret_key = "secret_key_123"
 
+# MongoDB Connection String
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://pratheeshh583225106064_db_user:plcKiS5p7c4S0G15@bitron.gge3k34.mongodb.net/?appName=Bitron")
 
-client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
+# SSL & Certificate Errors சரிசெய்யப்பட்ட MongoClient
+client = MongoClient(
+    MONGO_URI,
+    tls=True,
+    tlsAllowInvalidCertificates=True,
+    tlsCAFile=certifi.where()
+)
 
 db = client['attendance_system']
 members_col = db['members']
@@ -166,7 +173,6 @@ def download_excel():
     output = io.StringIO()
     writer = csv.writer(output)
     
-    # Headers
     writer.writerow(['Name', 'Role', 'Email', 'Date', 'Time (IST)', 'Status'])
     
     attendance_records = attendance_col.find().sort('_id', -1)
