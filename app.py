@@ -1,9 +1,9 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, Response
 from pymongo import MongoClient
 import certifi
 from datetime import datetime
 import pytz
-import pandas as pd
+import csv
 import io
 import re
 import os
@@ -11,10 +11,8 @@ import os
 app = Flask(__name__)
 app.secret_key = "secret_key_123"
 
-# Render Environment Variable அல்லது Direct URI
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://pratheeshh583225106064_db_user:plcKiS5p7c4S0G15@bitron.gge3k34.mongodb.net/?appName=Bitron")
 
-# tlsCAFile=certifi.where() மூலம் SSL Handshake Error சரிசெய்யப்பட்டது
 client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
 
 db = client['attendance_system']
@@ -25,7 +23,6 @@ system_col = db['system_config']
 IST = pytz.timezone('Asia/Kolkata')
 
 def check_and_reset_weekly():
-    """ஒவ்வொரு புதிய வாரத்தின் தொடக்கத்திலும் பழைய Attendance Data-வை Reset செய்யும்"""
     now = datetime.now(IST)
     current_year, current_week, _ = now.isocalendar()
     
@@ -166,32 +163,28 @@ def report():
 
 @app.route('/download_excel')
 def download_excel():
-    reports = []
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Headers
+    writer.writerow(['Name', 'Role', 'Email', 'Date', 'Time (IST)', 'Status'])
+    
     attendance_records = attendance_col.find().sort('_id', -1)
     
     for att in attendance_records:
         member = members_col.find_one({'email': att['email']})
         name = member['name'] if member else 'Unknown'
         role = member['role'] if member else 'Unknown'
-        reports.append({
-            'Name': name,
-            'Role': role,
-            'Email': att['email'],
-            'Date': att['date'],
-            'Time (IST)': att['time'],
-            'Status': att['status']
-        })
+        writer.writerow([name, role, att['email'], att['date'], att['time'], att['status']])
         
-    df = pd.DataFrame(reports)
-    
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='Attendance_Report')
-    
     output.seek(0)
-    return send_file(output, 
-                     download_name=f"Attendance_Report_{datetime.now(IST).strftime('%Y-%m-%d')}.xlsx", 
-                     as_attachment=True)
+    filename = f"Attendance_Report_{datetime.now(IST).strftime('%Y-%m-%d')}.csv"
+    
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-disposition": f"attachment; filename={filename}"}
+    )
 
 if __name__ == '__main__':
     app.run(debug=True)
