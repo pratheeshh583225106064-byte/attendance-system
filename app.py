@@ -1,9 +1,10 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, Response
+from flask import Flask, render_template, request, redirect, url_for, flash, send_file
 from pymongo import MongoClient
 import certifi
 from datetime import datetime
 import pytz
-import csv
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 import io
 import re
 import os
@@ -14,7 +15,6 @@ app.secret_key = "secret_key_123"
 # MongoDB Connection String
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://pratheeshh583225106064_db_user:plcKiS5p7c4S0G15@bitron.gge3k34.mongodb.net/?appName=Bitron")
 
-# SSL & Certificate Errors சரிசெய்யப்பட்ட MongoClient
 client = MongoClient(
     MONGO_URI,
     tls=True,
@@ -170,26 +170,70 @@ def report():
 
 @app.route('/download_excel')
 def download_excel():
-    output = io.StringIO()
-    writer = csv.writer(output)
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Attendance Report"
     
-    writer.writerow(['Name', 'Role', 'Email', 'Date', 'Time (IST)', 'Status'])
+    # Border Style 정의
+    thin_border = Border(
+        left=Side(style='thin', color='D3D3D3'),
+        right=Side(style='thin', color='D3D3D3'),
+        top=Side(style='thin', color='D3D3D3'),
+        bottom=Side(style='thin', color='D3D3D3')
+    )
     
+    # Header Styling
+    headers = ['Name', 'Role', 'Email', 'Date', 'Time (IST)', 'Status']
+    ws.append(headers)
+    
+    header_font = Font(name="Arial", size=11, bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+    
+    for cell in ws[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = thin_border
+
+    # Data Formatting
     attendance_records = attendance_col.find().sort('_id', -1)
     
-    for att in attendance_records:
+    data_font = Font(name="Arial", size=10)
+    
+    for row_idx, att in enumerate(attendance_records, start=2):
         member = members_col.find_one({'email': att['email']})
         name = member['name'] if member else 'Unknown'
         role = member['role'] if member else 'Unknown'
-        writer.writerow([name, role, att['email'], att['date'], att['time'], att['status']])
         
+        row_data = [name, role, att['email'], att['date'], att['time'], att['status']]
+        ws.append(row_data)
+        
+        # Alternating Row Colors (Zebra Striping)
+        row_fill = PatternFill(start_color="F9FAFB", end_color="F9FAFB", fill_type="solid") if row_idx % 2 == 0 else PatternFill(fill_type=None)
+        
+        for cell in ws[row_idx]:
+            cell.font = data_font
+            cell.border = thin_border
+            cell.fill = row_fill
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Column Width Adjustment
+    for col in ws.columns:
+        max_len = max(len(str(cell.value or '')) for cell in col)
+        col_letter = openpyxl.utils.get_column_letter(col[0].column)
+        ws.column_dimensions[col_letter].width = max(max_len + 6, 16)
+        
+    output = io.BytesIO()
+    wb.save(output)
     output.seek(0)
-    filename = f"Attendance_Report_{datetime.now(IST).strftime('%Y-%m-%d')}.csv"
     
-    return Response(
-        output.getvalue(),
-        mimetype="text/csv",
-        headers={"Content-disposition": f"attachment; filename={filename}"}
+    filename = f"Attendance_Report_{datetime.now(IST).strftime('%Y-%m-%d')}.xlsx"
+    
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
 if __name__ == '__main__':
