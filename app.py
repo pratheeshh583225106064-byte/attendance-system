@@ -15,11 +15,11 @@ app.secret_key = "secret_key_123"
 # MongoDB Connection String
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://pratheeshh583225106064_db_user:plcKiS5p7c4S0G15@bitron.gge3k34.mongodb.net/?appName=Bitron")
 
+# Strict SSL Check-ஐ தவிர்க்க tlsInsecure=True சேர்க்கப்பட்டது
 client = MongoClient(
     MONGO_URI,
     tls=True,
-    tlsAllowInvalidCertificates=True,
-    tlsCAFile=certifi.where()
+    tlsInsecure=True
 )
 
 db = client['attendance_system']
@@ -174,7 +174,7 @@ def download_excel():
     ws = wb.active
     ws.title = "Attendance Report"
     
-    # Border Style 정의
+    # Border Style
     thin_border = Border(
         left=Side(style='thin', color='D3D3D3'),
         right=Side(style='thin', color='D3D3D3'),
@@ -182,7 +182,7 @@ def download_excel():
         bottom=Side(style='thin', color='D3D3D3')
     )
     
-    # Header Styling
+    # Headers
     headers = ['Name', 'Role', 'Email', 'Date', 'Time (IST)', 'Status']
     ws.append(headers)
     
@@ -208,7 +208,6 @@ def download_excel():
         row_data = [name, role, att['email'], att['date'], att['time'], att['status']]
         ws.append(row_data)
         
-        # Alternating Row Colors (Zebra Striping)
         row_fill = PatternFill(start_color="F9FAFB", end_color="F9FAFB", fill_type="solid") if row_idx % 2 == 0 else PatternFill(fill_type=None)
         
         for cell in ws[row_idx]:
@@ -217,7 +216,7 @@ def download_excel():
             cell.fill = row_fill
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Column Width Adjustment
+    # Column Width Auto-Adjustment
     for col in ws.columns:
         max_len = max(len(str(cell.value or '')) for cell in col)
         col_letter = openpyxl.utils.get_column_letter(col[0].column)
