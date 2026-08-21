@@ -1,5 +1,7 @@
 Flask
-gunicorn
+pymongo
+dnspython
 pandas
 openpyxl
 pytz
+gunicorn
