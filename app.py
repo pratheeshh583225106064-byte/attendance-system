@@ -1,65 +1,69 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file
-import sqlite3
+from pymongo import MongoClient
 from datetime import datetime
 import pytz
 import pandas as pd
 import io
 import re
+import os
 
 app = Flask(__name__)
 app.secret_key = "secret_key_123"
-DB_NAME = "attendance.db"
+
+# MongoDB Atlas Connection
+MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://pratheeshh583225106064_db_user:plcKiS5p7c4S0G15@bitron.gge3k34.mongodb.net/?appName=Bitron")
+
+client = MongoClient(MONGO_URI)
+db = client['attendance_system']
+members_col = db['members']
+attendance_col = db['attendance']
+system_col = db['system_config']  # Weekly reset tracking-க்காக புதிய Collection
 
 IST = pytz.timezone('Asia/Kolkata')
 
+def check_and_reset_weekly():
+    """ஒவ்வொரு புதிய வாரத்தின் தொடக்கத்திலும் பழைய Attendance Data-வை Reset செய்யும்"""
+    now = datetime.now(IST)
+    current_year, current_week, _ = now.isocalendar()
+    
+    config = system_col.find_one({'type': 'weekly_tracker'})
+    
+    if not config:
+        # முதல் முறை இயங்கும்போது தற்போதைய வாரத்தை சேமிக்கும்
+        system_col.insert_one({'type': 'weekly_tracker', 'year': current_year, 'week': current_week})
+    else:
+        # சேமிக்கப்பட்ட வாரத்தை விட தற்போதைய வாரம் மாறினால் Attendance Cleared ஆகும்
+        if config['year'] < current_year or config['week'] < current_week:
+            attendance_col.delete_many({})  # அனைத்து பழைய attendance பதிவுகளும் நீக்கப்படும்
+            system_col.update_one(
+                {'type': 'weekly_tracker'},
+                {'$set': {'year': current_year, 'week': current_week}}
+            )
+
 def init_db():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS members (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            role TEXT NOT NULL
-        )
-    ''')
-    
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS attendance (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT NOT NULL,
-            date TEXT NOT NULL,
-            time TEXT NOT NULL,
-            status TEXT NOT NULL
-        )
-    ''')
-    
-    # 7 அங்கீகரிக்கப்பட்ட உறுப்பினர்கள் பட்டியல்
     default_members = [
-        ('Sivamani V', 'sivamani1234@gmail.com', 'CEO & Founder'),
-        ('Anusha', 'anusha1234@gmail.com', 'Technical coordinator'),
-        ('Dharsana G', 'dharsana1234@gmail.com', 'IoT Engineer'),
-        ('Aisha mariyam', 'aisha1234@gmail.com', 'IoT Engineer'),
-        ('Meenakshi Priyadarshini', 'meenakshi1234@gmail.com', 'PCB Designer'),
-        ('Shyam kumar M', 'shyam1234@gmail.com', 'PCB designer'),
-        ('Pratheesh H', 'pratheesh1234@gmail.com', 'PCB designer')  # உங்கள் பெயர் சேர்க்கப்பட்டுள்ளது
+        {'name': 'Sivamani V', 'email': 'sivamani1234@gmail.com', 'role': 'CEO & Founder'},
+        {'name': 'Anusha', 'email': 'anusha1234@gmail.com', 'role': 'Technical coordinator'},
+        {'name': 'Dharsana G', 'email': 'dharsana1234@gmail.com', 'role': 'IoT Engineer'},
+        {'name': 'Aisha mariyam', 'email': 'aisha1234@gmail.com', 'role': 'IoT Engineer'},
+        {'name': 'Meenakshi Priyadarshini', 'email': 'meenakshi1234@gmail.com', 'role': 'PCB Designer'},
+        {'name': 'Shyam kumar M', 'email': 'shyam1234@gmail.com', 'role': 'PCB designer'},
+        {'name': 'Pratheesh H', 'email': 'pratheesh1234@gmail.com', 'role': 'PCB designer'}
     ]
     
-    for name, email, role in default_members:
-        cursor.execute("INSERT OR IGNORE INTO members (name, email, role) VALUES (?, ?, ?)", (name, email, role))
-        
-    conn.commit()
-    conn.close()
+    for member in default_members:
+        members_col.update_one(
+            {'email': member['email']},
+            {'$setOnInsert': member},
+            upsert=True
+        )
 
 init_db()
 
-# 1. பிரதான பக்கம் (Main BITRON Website)
 @app.route('/')
 def home():
     return render_template('bitron-website-1.html')
 
-# 2. லாகின் பக்கம் (Attendance Portal Login)
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -75,23 +79,14 @@ def login():
             flash("❌ Invalid Email Format! Email must be like: name1234@gmail.com")
             return redirect(url_for('login'))
 
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
+        user = members_col.find_one({'email': email})
         
-        cursor.execute("SELECT email FROM members WHERE email=?", (email,))
-        user = cursor.fetchone()
-        
-        # 7 பேரைத் தவிர வேறு யாராவது லாகின் செய்தால் தடுக்கும் பகுதி
         if not user:
-            conn.close()
             flash("❌ Access Denied! You are not an authorized member.")
             return redirect(url_for('login'))
         else:
-            cursor.execute("UPDATE members SET name=? WHERE email=?", (name, email))
-            conn.commit()
-            
-        conn.close()
-        return redirect(url_for('dashboard', email=email))
+            members_col.update_one({'email': email}, {'$set': {'name': name}})
+            return redirect(url_for('dashboard', email=email))
         
     return render_template('login.html')
 
@@ -101,42 +96,39 @@ def dashboard():
     if not email:
         return redirect(url_for('login'))
         
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT name, email, role FROM members WHERE email=?", (email,))
-    user = cursor.fetchone()
-    
+    user = members_col.find_one({'email': email})
     if not user:
-        conn.close()
         return redirect(url_for('login'))
         
-    cursor.execute("SELECT date, time, status FROM attendance WHERE email=? ORDER BY id DESC", (email,))
-    history = cursor.fetchall()
+    history_cursor = attendance_col.find({'email': email}).sort('_id', -1)
+    history = [[doc['date'], doc['time'], doc['status']] for doc in history_cursor]
     
     now = datetime.now(IST)
     today_date = now.strftime("%Y-%m-%d")
     
-    cursor.execute("SELECT status, time FROM attendance WHERE email=? AND date=?", (email, today_date))
-    today_attendance = cursor.fetchone()
+    today_rec = attendance_col.find_one({'email': email, 'date': today_date})
+    today_attendance = (today_rec['status'], today_rec['time']) if today_rec else None
     
     selected_date = request.form.get('selected_date', today_date)
     
-    cursor.execute("SELECT status, time FROM attendance WHERE email=? AND date=?", (email, selected_date))
-    date_record = cursor.fetchone()
+    date_rec = attendance_col.find_one({'email': email, 'date': selected_date})
+    date_record = (date_rec['status'], date_rec['time']) if date_rec else None
     
     total_present = sum(1 for row in history if row[2] == 'Present')
     total_absent = sum(1 for row in history if row[2] == 'Absent')
     
-    conn.close()
+    user_tuple = (user['name'], user['email'], user['role'])
     
-    return render_template('dashboard.html', user=user, history=history, 
+    return render_template('dashboard.html', user=user_tuple, history=history, 
                            today_date=today_date, selected_date=selected_date,
                            date_record=date_record, today_attendance=today_attendance,
                            total_present=total_present, total_absent=total_absent)
 
 @app.route('/mark_attendance', methods=['POST'])
 def mark_attendance():
+    # அட்டெண்டன்ஸ் பதிவு செய்யும் முன் புதிய வாரமா என்று சரிபார்க்கப்படும்
+    check_and_reset_weekly()
+
     email = request.form.get('email')
     status = request.form.get('status')
     
@@ -144,52 +136,53 @@ def mark_attendance():
     date = now.strftime("%Y-%m-%d")
     time = now.strftime("%I:%M:%S %p")
     
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT id FROM attendance WHERE email=? AND date=?", (email, date))
-    existing_record = cursor.fetchone()
+    existing_record = attendance_col.find_one({'email': email, 'date': date})
     
     if existing_record:
         flash("❌ Attendance already marked for today!")
     else:
-        cursor.execute("INSERT INTO attendance (email, date, time, status) VALUES (?, ?, ?, ?)", 
-                       (email, date, time, status))
-        conn.commit()
+        attendance_col.insert_one({
+            'email': email,
+            'date': date,
+            'time': time,
+            'status': status
+        })
         flash("✅ Attendance Marked Successfully!")
         
-    conn.close()
     return redirect(url_for('dashboard', email=email))
 
 @app.route('/report')
 def report():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
+    reports = []
+    attendance_records = attendance_col.find().sort('_id', -1)
     
-    query = """
-        SELECT m.name, m.role, a.email, a.date, a.time, a.status
-        FROM attendance a
-        JOIN members m ON a.email = m.email
-        ORDER BY a.id DESC
-    """
-    cursor.execute(query)
-    reports = cursor.fetchall()
-    conn.close()
-    
+    for att in attendance_records:
+        member = members_col.find_one({'email': att['email']})
+        name = member['name'] if member else 'Unknown'
+        role = member['role'] if member else 'Unknown'
+        reports.append((name, role, att['email'], att['date'], att['time'], att['status']))
+        
     return render_template('report.html', reports=reports)
 
 @app.route('/download_excel')
 def download_excel():
-    conn = sqlite3.connect(DB_NAME)
-    query = """
-        SELECT m.name AS 'Name', m.role AS 'Role', a.email AS 'Email', 
-               a.date AS 'Date', a.time AS 'Time (IST)', a.status AS 'Status'
-        FROM attendance a 
-        JOIN members m ON a.email = m.email 
-        ORDER BY a.id DESC
-    """
-    df = pd.read_sql_query(query, conn)
-    conn.close()
+    reports = []
+    attendance_records = attendance_col.find().sort('_id', -1)
+    
+    for att in attendance_records:
+        member = members_col.find_one({'email': att['email']})
+        name = member['name'] if member else 'Unknown'
+        role = member['role'] if member else 'Unknown'
+        reports.append({
+            'Name': name,
+            'Role': role,
+            'Email': att['email'],
+            'Date': att['date'],
+            'Time (IST)': att['time'],
+            'Status': att['status']
+        })
+        
+    df = pd.DataFrame(reports)
     
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
