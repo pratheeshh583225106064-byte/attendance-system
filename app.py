@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file
 from pymongo import MongoClient
+import certifi
 from datetime import datetime
 import pytz
 import pandas as pd
@@ -10,14 +11,16 @@ import os
 app = Flask(__name__)
 app.secret_key = "secret_key_123"
 
-# MongoDB Atlas Connection
+# Render Environment Variable அல்லது Direct URI
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://pratheeshh583225106064_db_user:plcKiS5p7c4S0G15@bitron.gge3k34.mongodb.net/?appName=Bitron")
 
-client = MongoClient(MONGO_URI)
+# tlsCAFile=certifi.where() மூலம் SSL Handshake Error சரிசெய்யப்பட்டது
+client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
+
 db = client['attendance_system']
 members_col = db['members']
 attendance_col = db['attendance']
-system_col = db['system_config']  # Weekly reset tracking-க்காக புதிய Collection
+system_col = db['system_config']
 
 IST = pytz.timezone('Asia/Kolkata')
 
@@ -29,12 +32,10 @@ def check_and_reset_weekly():
     config = system_col.find_one({'type': 'weekly_tracker'})
     
     if not config:
-        # முதல் முறை இயங்கும்போது தற்போதைய வாரத்தை சேமிக்கும்
         system_col.insert_one({'type': 'weekly_tracker', 'year': current_year, 'week': current_week})
     else:
-        # சேமிக்கப்பட்ட வாரத்தை விட தற்போதைய வாரம் மாறினால் Attendance Cleared ஆகும்
         if config['year'] < current_year or config['week'] < current_week:
-            attendance_col.delete_many({})  # அனைத்து பழைய attendance பதிவுகளும் நீக்கப்படும்
+            attendance_col.delete_many({})
             system_col.update_one(
                 {'type': 'weekly_tracker'},
                 {'$set': {'year': current_year, 'week': current_week}}
@@ -126,7 +127,6 @@ def dashboard():
 
 @app.route('/mark_attendance', methods=['POST'])
 def mark_attendance():
-    # அட்டெண்டன்ஸ் பதிவு செய்யும் முன் புதிய வாரமா என்று சரிபார்க்கப்படும்
     check_and_reset_weekly()
 
     email = request.form.get('email')
