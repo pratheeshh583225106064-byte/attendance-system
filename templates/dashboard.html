@@ -14,13 +14,19 @@
 </head>
 <body>
     <div class="container py-4">
-        <!-- Header -->
-        <div class="d-flex justify-content-between align-items-center mb-4">
+        <!-- Header & Action Buttons -->
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
             <div>
                 <h2>Welcome, {{ user[0] }}</h2>
                 <p class="text-muted mb-0">{{ user[2] }} | {{ user[1] }}</p>
             </div>
-            <a href="/login" class="btn btn-outline-danger">Logout</a>
+            <div>
+                <!-- Download Excel Report Button -->
+                <a href="/download_excel" class="btn btn-success me-2">
+                    📊 Download Excel Report
+                </a>
+                <a href="/login" class="btn btn-outline-danger">Logout</a>
+            </div>
         </div>
 
         <!-- Flash Messages -->
@@ -36,10 +42,11 @@
         {% endwith %}
 
         <div class="row g-4">
-            <!-- Mark Attendance & Stats Section -->
+            <!-- Left Column: Attendance & Report Submission -->
             <div class="col-md-6">
+                <!-- Today's Attendance -->
                 <div class="card p-4 shadow-sm mb-4">
-                    <h4>📍 Attendance Action</h4>
+                    <h4>📍 Daily Attendance</h4>
                     <p class="text-secondary">Today's Date: <strong>{{ today_date }}</strong></p>
                     
                     {% if today_attendance %}
@@ -52,6 +59,34 @@
                             <button type="submit" name="status" value="Present" class="btn btn-success flex-fill">Mark Present</button>
                             <button type="submit" name="status" value="Absent" class="btn btn-danger flex-fill">Mark Absent</button>
                         </form>
+                    {% endif %}
+                </div>
+
+                <!-- Calendar Date Search Filter -->
+                <div class="card p-4 shadow-sm mb-4">
+                    <h4>📅 Search Attendance by Date</h4>
+                    <form action="/dashboard" method="POST" class="row g-2 align-items-center mt-1">
+                        <input type="hidden" name="email" value="{{ user[1] }}">
+                        <div class="col-8">
+                            <input type="date" name="selected_date" class="form-control" value="{{ selected_date }}" required>
+                        </div>
+                        <div class="col-4">
+                            <button type="submit" class="btn btn-custom w-100">Search</button>
+                        </div>
+                    </form>
+
+                    {% if selected_date %}
+                        <div class="mt-3 p-3 bg-light rounded border">
+                            <small class="text-muted d-block mb-1">Result for <strong>{{ selected_date }}</strong>:</small>
+                            {% if date_record %}
+                                <span class="badge {% if date_record[0] == 'Present' %}bg-success{% else %}bg-danger{% endif %} fs-6">
+                                    {{ date_record[0] }}
+                                </span>
+                                <small class="ms-2 text-secondary">at {{ date_record[1] }}</small>
+                            {% else %}
+                                <span class="text-warning">⚠️ No record found for this date.</span>
+                            {% endif %}
+                        </div>
                     {% endif %}
                 </div>
 
@@ -86,7 +121,7 @@
                 </div>
             </div>
 
-            <!-- Attendance Summary & History -->
+            <!-- Right Column: Stats & Recent History -->
             <div class="col-md-6">
                 <div class="card p-4 shadow-sm mb-4">
                     <h4>📊 Weekly Stats</h4>
