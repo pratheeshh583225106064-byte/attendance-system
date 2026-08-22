@@ -5,6 +5,7 @@ from datetime import datetime
 import pytz
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from werkzeug.utils import secure_filename
 import io
 import re
 import os
@@ -12,10 +13,17 @@ import os
 app = Flask(__name__)
 app.secret_key = "secret_key_123"
 
+# File Upload Configuration
+UPLOAD_FOLDER = 'static/uploads'
+ALLOWED_EXTENSIONS = {'pdf', 'docx', 'doc', 'png', 'jpg', 'jpeg', 'xlsx'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Ensure upload directory exists
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
 # MongoDB Connection String
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://pratheeshh583225106064_db_user:plcKiS5p7c4S0G15@bitron.gge3k34.mongodb.net/?appName=Bitron")
 
-# Certifi CA File மூலம் SSL சரிபார்க்கும் முறை
 client = MongoClient(
     MONGO_URI,
     tlsCAFile=certifi.where()
@@ -25,8 +33,12 @@ db = client['attendance_system']
 members_col = db['members']
 attendance_col = db['attendance']
 system_col = db['system_config']
+reports_col = db['daily_reports']
 
 IST = pytz.timezone('Asia/Kolkata')
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def check_and_reset_weekly():
     now = datetime.now(IST)
@@ -39,6 +51,7 @@ def check_and_reset_weekly():
     else:
         if config['year'] < current_year or config['week'] < current_week:
             attendance_col.delete_many({})
+            reports_col.delete_many({})
             system_col.update_one(
                 {'type': 'weekly_tracker'},
                 {'$set': {'year': current_year, 'week': current_week}}
@@ -113,6 +126,10 @@ def dashboard():
     today_rec = attendance_col.find_one({'email': email, 'date': today_date})
     today_attendance = (today_rec['status'], today_rec['time']) if today_rec else None
     
+    today_report_rec = reports_col.find_one({'email': email, 'date': today_date})
+    today_work_report = today_report_rec['work_done'] if today_report_rec else None
+    today_file_path = today_report_rec.get('file_path') if today_report_rec else None
+
     selected_date = request.form.get('selected_date', today_date)
     
     date_rec = attendance_col.find_one({'email': email, 'date': selected_date})
@@ -126,6 +143,7 @@ def dashboard():
     return render_template('dashboard.html', user=user_tuple, history=history, 
                            today_date=today_date, selected_date=selected_date,
                            date_record=date_record, today_attendance=today_attendance,
+                           today_work_report=today_work_report, today_file_path=today_file_path,
                            total_present=total_present, total_absent=total_absent)
 
 @app.route('/mark_attendance', methods=['POST'])
@@ -154,6 +172,40 @@ def mark_attendance():
         
     return redirect(url_for('dashboard', email=email))
 
+@app.route('/submit_daily_report', methods=['POST'])
+def submit_daily_report():
+    check_and_reset_weekly()
+
+    email = request.form.get('email')
+    work_done = request.form.get('work_done')
+    file = request.files.get('report_file')
+    
+    file_path = None
+    if file and file.filename != '' and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        unique_filename = f"{datetime.now(IST).strftime('%Y%m%d%H%M%S')}_{filename}"
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+        file.save(file_path)
+
+    now = datetime.now(IST)
+    date = now.strftime("%Y-%m-%d")
+    time = now.strftime("%I:%M:%S %p")
+
+    reports_col.update_one(
+        {'email': email, 'date': date},
+        {'$set': {
+            'email': email, 
+            'date': date, 
+            'time': time, 
+            'work_done': work_done,
+            'file_path': file_path
+        }},
+        upsert=True
+    )
+    
+    flash("✅ Daily Work Report Submitted Successfully!")
+    return redirect(url_for('dashboard', email=email))
+
 @app.route('/report')
 def report():
     reports = []
@@ -163,7 +215,12 @@ def report():
         member = members_col.find_one({'email': att['email']})
         name = member['name'] if member else 'Unknown'
         role = member['role'] if member else 'Unknown'
-        reports.append((name, role, att['email'], att['date'], att['time'], att['status']))
+        
+        rep = reports_col.find_one({'email': att['email'], 'date': att['date']})
+        work_done = rep['work_done'] if rep else 'Not Submitted'
+        file_path = rep.get('file_path') if rep else None
+        
+        reports.append((name, role, att['email'], att['date'], att['time'], att['status'], work_done, file_path))
         
     return render_template('report.html', reports=reports)
 
@@ -171,7 +228,7 @@ def report():
 def download_excel():
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = "Attendance Report"
+    ws.title = "Attendance & Work Report"
     
     thin_border = Border(
         left=Side(style='thin', color='D3D3D3'),
@@ -180,7 +237,7 @@ def download_excel():
         bottom=Side(style='thin', color='D3D3D3')
     )
     
-    headers = ['Name', 'Role', 'Email', 'Date', 'Time (IST)', 'Status']
+    headers = ['Name', 'Role', 'Email', 'Date', 'Time (IST)', 'Status', 'Daily Work Report', 'Attachment File']
     ws.append(headers)
     
     header_font = Font(name="Arial", size=11, bold=True, color="FFFFFF")
@@ -200,7 +257,11 @@ def download_excel():
         name = member['name'] if member else 'Unknown'
         role = member['role'] if member else 'Unknown'
         
-        row_data = [name, role, att['email'], att['date'], att['time'], att['status']]
+        rep = reports_col.find_one({'email': att['email'], 'date': att['date']})
+        work_done = rep['work_done'] if rep else 'Not Submitted'
+        file_path = rep.get('file_path', 'No File') if rep else 'No File'
+        
+        row_data = [name, role, att['email'], att['date'], att['time'], att['status'], work_done, file_path]
         ws.append(row_data)
         
         row_fill = PatternFill(start_color="F9FAFB", end_color="F9FAFB", fill_type="solid") if row_idx % 2 == 0 else PatternFill(fill_type=None)
@@ -220,7 +281,7 @@ def download_excel():
     wb.save(output)
     output.seek(0)
     
-    filename = f"Attendance_Report_{datetime.now(IST).strftime('%Y-%m-%d')}.xlsx"
+    filename = f"Attendance_Work_Report_{datetime.now(IST).strftime('%Y-%m-%d')}.xlsx"
     
     return send_file(
         output,
@@ -231,3 +292,4 @@ def download_excel():
 
 if __name__ == '__main__':
     app.run(debug=True)
+        
